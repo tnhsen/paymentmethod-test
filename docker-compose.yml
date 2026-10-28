@@ -1,0 +1,37 @@
+services:
+  postgres:
+    image: postgres:17
+    environment:
+      POSTGRES_DB: payment
+      POSTGRES_USER: payment
+      POSTGRES_PASSWORD: payment
+    healthcheck:
+      test: [CMD-SHELL, pg_isready -U payment]
+      interval: 5s
+      retries: 10
+    volumes:
+      - payment-data:/var/lib/postgresql/data
+  api:
+    build: .
+    env_file: .env
+    environment:
+      HOST: 0.0.0.0
+      DATABASE_URL: postgres://payment:payment@postgres:5432/payment
+    ports:
+      - "4000:4000"
+    depends_on:
+      postgres:
+        condition: service_healthy
+  demo:
+    build: .
+    command: [pnpm, exec, tsx, examples/plain-html/server.ts]
+    env_file: .env
+    environment:
+      HOST: 0.0.0.0
+      API_BASE: http://api:4000
+    ports:
+      - "5173:5173"
+    depends_on:
+      - api
+volumes:
+  payment-data:

@@ -1,0 +1,24 @@
+{
+  "name": "@payment-qr/react",
+  "version": "0.1.0",
+  "type": "module",
+  "exports": {
+    ".": {
+      "types": "./src/index.tsx",
+      "default": "./dist/index.js"
+    }
+  },
+  "scripts": {
+    "build": "tsc src/index.tsx --outDir dist --target ES2022 --module NodeNext --moduleResolution NodeNext --declaration --jsx react-jsx --skipLibCheck --esModuleInterop"
+  },
+  "dependencies": {
+    "@payment-qr/web-component": "workspace:*",
+    "@payment-qr/core": "workspace:*"
+  },
+  "peerDependencies": {
+    "react": "^18.0.0 || ^19.0.0"
+  },
+  "devDependencies": {
+    "react": "^19.0.0"
+  }
+}

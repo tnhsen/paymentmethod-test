@@ -1,0 +1,9 @@
+node_modules/
+dist/
+.next/
+*.db
+*.db-shm
+*.db-wal
+.env
+test-results/
+playwright-report/

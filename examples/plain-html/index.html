@@ -1,0 +1,16 @@
+<!doctype html><html lang="th"><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1"><title>Payment QR demo</title><style>
+*{box-sizing:border-box}
+body{font:16px system-ui;margin:0;min-height:100vh;min-height:100dvh;padding:20px;display:flex;flex-direction:column;align-items:center;justify-content:center;text-align:center}
+main{width:100%;max-width:360px}
+pay-qr{width:100%;margin-inline:auto}
+#payment-timer{margin:16px 0 0}
+#result{margin:12px 0 0}
+#result:empty{display:none}
+button{padding:12px;margin:16px 0}
+</style><body><main>
+<!-- <h1>PromptPay QR • Mock checkout</h1><p>กรอกยอดเงินเพื่อทดสอบ (บาท) — ไม่มีการรับเงินจริง</p> -->
+<pay-qr api-base="http://localhost:4000" mode="input" create-payment-url="/api/create-payment" min="1" max="100000" locale="th"></pay-qr>
+<p id="payment-timer" role="timer" hidden>เวลาชำระเงินคงเหลือ <strong id="time-left">02:00</strong></p><p id="result" role="status"></p>
+</main><script type="module" src="/checkout.js"></script>
+</body>
+</html>

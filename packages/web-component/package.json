@@ -1,0 +1,19 @@
+{
+  "name": "@payment-qr/web-component",
+  "version": "0.1.0",
+  "type": "module",
+  "exports": {
+    ".": {
+      "types": "./src/index.ts",
+      "default": "./dist/pay-qr.js"
+    }
+  },
+  "scripts": {
+    "build": "vite build"
+  },
+  "dependencies": {
+    "@payment-qr/core": "workspace:*",
+    "lit": "^3.3.1",
+    "qrcode": "^1.5.4"
+  }
+}

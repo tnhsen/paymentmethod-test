@@ -1,0 +1,17 @@
+{
+  "name": "@payment-qr/sdk-js",
+  "version": "0.1.0",
+  "type": "module",
+  "exports": {
+    ".": {
+      "types": "./src/index.ts",
+      "default": "./dist/index.js"
+    }
+  },
+  "scripts": {
+    "build": "tsc src/index.ts --outDir dist --target ES2022 --module NodeNext --moduleResolution NodeNext --declaration --skipLibCheck"
+  },
+  "dependencies": {
+    "@payment-qr/core": "workspace:*"
+  }
+}

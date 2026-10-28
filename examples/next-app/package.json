@@ -1,0 +1,19 @@
+{
+  "name": "payment-qr-next-example",
+  "private": true,
+  "type": "module",
+  "scripts": {
+    "dev": "next dev",
+    "build": "next build"
+  },
+  "dependencies": {
+    "@payment-qr/react": "workspace:*",
+    "@payment-qr/sdk-js": "workspace:*",
+    "next": "^15.5.0",
+    "react": "^19.0.0",
+    "react-dom": "^19.0.0"
+  },
+  "devDependencies": {
+    "@types/react-dom": "^19.0.0"
+  }
+}

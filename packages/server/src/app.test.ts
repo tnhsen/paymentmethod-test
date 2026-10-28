@@ -1,0 +1,31 @@
+import { beforeEach, afterEach, describe, it, expect } from 'vitest';
+import { buildApp, hashKey } from './app.js';
+import { SQLiteRepository } from './repository.js';
+import { MockProvider } from './providers.js';
+describe('payment API', () => {
+    let repo: SQLiteRepository;
+    let mock: MockProvider;
+    let service: Awaited<ReturnType<typeof buildApp>>;
+    let clock: number;
+    const merchant = { authorization: 'Bearer test-key' };
+    let auth: Record<string, string>;
+    beforeEach(async () => { clock = Date.now(); repo = new SQLiteRepository(':memory:'); mock = new MockProvider('test-webhook-secret'); service = await buildApp({ repo, providers: [mock], tokenSecret: 't'.repeat(32), enableMock: true, jobs: false, now: () => clock }); await repo.putMerchant({ id: 'm', keyHash: hashKey('test-key'), origins: ['http://allowed.test'] }); });
+    afterEach(async () => { await service.app.close(); });
+    async function create(ttl = 300, key: string = crypto.randomUUID()) { const r = await service.app.inject({ method: 'POST', url: '/v1/payments', headers: { ...merchant, 'idempotency-key': key }, payload: { amountSatang: 12345, expiresInSeconds: ttl } }); expect(r.statusCode).toBe(201); const b = r.json(); auth = { authorization: 'Bearer ' + b.clientToken }; return b.payment; }
+    async function qr(id: string) { const r = await service.app.inject({ method: 'POST', url: `/v1/payments/${id}/qr`, headers: auth }); expect(r.statusCode).toBe(200); return r.json(); }
+    async function webhook(p: any, overrides: any = {}, signed = true) { const raw = Buffer.from(JSON.stringify({ eventId: 'event-1', paymentId: p.id, providerRef: p.id, status: 'paid', amountSatang: p.amountSatang, currency: 'THB', ...overrides }, null, 2)); return service.app.inject({ method: 'POST', url: '/v1/webhooks/mock', headers: { 'content-type': 'application/json', 'x-signature': signed ? mock.sign(raw) : '0'.repeat(64) }, payload: raw }); }
+    it('create → QR → signed raw webhook → paid SSE; duplicate is stable', async () => { const p = await create(); await qr(p.id); await service.app.listen({ port: 0, host: '127.0.0.1' }); const address = service.app.server.address() as {
+        port: number;
+    }; const controller = new AbortController(); const response = await fetch(`http://127.0.0.1:${address.port}/v1/payments/${p.id}/events`, { headers: auth, signal: controller.signal }); expect(response.headers.get('content-type')).toContain('text/event-stream'); const reader = response.body!.getReader(); let text = ''; text += new TextDecoder().decode((await reader.read()).value); expect(text).toContain('qr_ready'); const first = await webhook(p); expect(first.statusCode).toBe(200); const second = await webhook(p); expect(second.json()).toEqual(first.json()); expect(first.json().qrPayload).toBeNull(); while (!text.includes('"status":"paid"')) {
+        const chunk = await reader.read();
+        if (chunk.done)
+            break;
+        text += new TextDecoder().decode(chunk.value);
+    } expect(text).toContain('"status":"paid"'); await reader.cancel(); controller.abort(); });
+    it('rejects amount mutation, mismatched currency/ref/amount and bad signatures', async () => { const p = await create(); const change = await service.app.inject({ method: 'POST', url: `/v1/payments/${p.id}/qr`, headers: auth, payload: { amountSatang: 1 } }); expect(change.statusCode).toBe(400); await qr(p.id); for (const override of [{ amountSatang: 1 }, { currency: 'USD' }, { providerRef: 'other' }])
+        expect((await webhook(p, override)).statusCode).toBe(409); expect((await webhook(p, {}, false)).statusCode).toBe(401); expect((await repo.get(p.id))!.status).toBe('qr_ready'); });
+    it('binds tokens to payment, enforces merchant CORS and expiry', async () => { const p = await create(1); const other = await create(); const wrong = await service.app.inject({ url: `/v1/payments/${p.id}`, headers: auth }); expect(wrong.statusCode).toBe(401); await qr(other.id); expect((await service.app.inject({ url: `/v1/payments/${other.id}`, headers: { ...auth, origin: 'http://evil.test' } })).statusCode).toBe(403); expect((await service.app.inject({ url: `/v1/payments/${other.id}`, headers: { ...auth, origin: 'http://allowed.test' } })).headers['access-control-allow-origin']).toBe('http://allowed.test'); clock += 1001; await service.expireJob(); expect((await repo.get(p.id))!.status).toBe('expired'); clock += 1000000; expect((await service.app.inject({ url: `/v1/payments/${other.id}`, headers: auth })).statusCode).toBe(401); });
+    it('idempotent create conflicts on different amount and persists key hashes', async () => { const p = await create(300, 'order-1'); const same = await service.app.inject({ method: 'POST', url: '/v1/payments', headers: { ...merchant, 'idempotency-key': 'order-1' }, payload: { amountSatang: 12345, expiresInSeconds: 300 } }); expect(same.json().payment.id).toBe(p.id); const conflict = await service.app.inject({ method: 'POST', url: '/v1/payments', headers: { ...merchant, 'idempotency-key': 'order-1' }, payload: { amountSatang: 1 } }); expect(conflict.statusCode).toBe(409); expect((await repo.merchant('m'))!.keyHash).not.toBe('test-key'); });
+    it('cancel and expire are immutable, reject late payment and clear QR', async () => { const p = await create(1); await qr(p.id); clock += 1001; await service.expireJob(); expect((await webhook(p)).json().status).toBe('expired'); expect((await repo.get(p.id))!.qrPayload).toBeNull(); const other = await create(); await qr(other.id); const cancel = () => service.app.inject({ method: 'POST', url: `/v1/payments/${other.id}/cancel`, headers: auth }); expect((await cancel()).json().status).toBe('cancelled'); expect((await cancel()).json().status).toBe('cancelled'); expect((await webhook(other)).json().status).toBe('cancelled'); });
+    it('reconciles verified provider status and exposes authenticated mock helper', async () => { const p = await create(); await qr(p.id); expect((await service.app.inject({ method: 'POST', url: `/dev/mock/${p.id}/pay` })).statusCode).toBe(401); mock.record({ eventId: 'reconcile', paymentId: p.id, providerRef: p.id, amountSatang: p.amountSatang, currency: 'THB', status: 'paid' }); await service.reconcile(); expect((await repo.get(p.id))!.status).toBe('paid'); });
+});

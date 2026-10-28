@@ -1,0 +1,3 @@
+import {defineConfig} from '@playwright/test';
+const env={MERCHANT_API_KEY:'e2e-test-key',TOKEN_SECRET:'e2e-token-secret-at-least-32-characters',MOCK_WEBHOOK_SECRET:'e2e-webhook-secret',ENABLE_MOCK:'true',SQLITE_PATH:':memory:',PORT:'4000',MERCHANT_ORIGINS:'http://localhost:5173',DEMO_EXPIRY_SECONDS:'4'};
+export default defineConfig({testDir:'tests',workers:1,use:{baseURL:'http://localhost:5173',browserName:'chromium'},webServer:[{command:'pnpm dev',url:'http://127.0.0.1:4000/health',env,reuseExistingServer:false},{command:'pnpm exec tsx examples/plain-html/server.ts',url:'http://localhost:5173',env,reuseExistingServer:false}]});
