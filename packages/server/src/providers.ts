@@ -31,6 +31,15 @@ export class MockProvider implements PaymentProvider {
     record(event: ProviderEvent) { this.statuses.set(event.paymentId, event); }
     async getStatus(p: Payment) { return this.statuses.get(p.id) ?? null; }
 }
+/** Generates a real transfer QR, but has no automatic bank confirmation. */
+export class DirectPromptPayProvider implements PaymentProvider {
+    name = 'promptpay';
+    constructor(private target: string) { buildPromptPayPayload(target, 100); }
+    async createQr(p: Payment) { return { providerRef: p.id, qrPayload: buildPromptPayPayload(this.target, p.amountSatang) }; }
+    async verifyWebhook(_raw: Buffer, _signature: string) { return false; }
+    parseWebhook(_raw: Buffer): ProviderEvent { throw new Error('Direct PromptPay has no verified webhook'); }
+    async getStatus(_p: Payment): Promise<ProviderEvent | null> { return null; }
+}
 export class OmiseProvider implements PaymentProvider {
     name = 'omise';
     // TODO: create PromptPay source + charge using server secret; bind charge ID,

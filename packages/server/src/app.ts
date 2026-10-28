@@ -100,7 +100,7 @@ export async function buildApp(options: AppOptions) {
         catch {
             throw fail(400, 'amountSatang must be a positive integer');
         }
-        const provider = b.provider ?? 'mock';
+        const provider = b.provider ?? (options.enableMock ? 'mock' : 'promptpay');
         if (!providers.has(provider) || (provider === 'mock' && !options.enableMock))
             throw fail(400, 'Provider unavailable');
         const ttl = b.expiresInSeconds ?? 300;
