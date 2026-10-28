@@ -66,7 +66,7 @@ export class PayQRElement extends LitElement {
     private async accept(p: Payment, epoch: number) {
         if (epoch !== this.epoch || p.id !== this.paymentId)
             return;
-        if (this.payment && (isTerminal(this.payment.status) || p.version < this.payment.version))
+        if (this.payment?.id === p.id && (isTerminal(this.payment.status) || p.version < this.payment.version))
             return;
         this.payment = p;
         if (isTerminal(p.status)) {
@@ -145,6 +145,9 @@ export class PayQRElement extends LitElement {
                 throw new Error(this.locale === 'th' ? 'ยอดเงินอยู่นอกช่วงที่กำหนด' : 'Amount out of range');
             if (!this.createPaymentUrl)
                 throw new Error('create-payment-url required');
+            this.stop();
+            this.clearQr();
+            this.payment = null;
             this.creating = true;
             this.state = 'loading';
             this.requestUpdate();
@@ -170,16 +173,41 @@ export class PayQRElement extends LitElement {
             this.failure(e);
         }
     }
+    private async newPayment() {
+        this.stop();
+        this.clearQr();
+        this.payment = null;
+        this.error = '';
+        // Suppress attribute-driven loading until old credentials are cleared.
+        this.creating = true;
+        this.paymentId = '';
+        this.clientToken = '';
+        this.state = 'input';
+        this.requestUpdate();
+        await this.updateComplete;
+        this.creating = false;
+    }
+    private async cancelPayment() {
+        const epoch = this.epoch;
+        try {
+            const payment = await this.json(this.url('/cancel'), { method: 'POST' });
+            await this.accept(payment, epoch);
+        } catch (e) {
+            // SSE may already have delivered cancellation and aborted this request.
+            if (epoch === this.epoch) this.failure(e);
+        }
+    }
     private text(th: string, en: string) { return this.locale === 'en' ? en : th; }
     render() {
         return html `<section class="box" aria-live="polite">
     ${this.state === 'input' ? html `<form @submit=${this.create}><label>${this.text('จำนวนเงิน (บาท)', 'Amount (THB)')}<input name="amount" inputmode="decimal" required .value=${this.amount} @input=${(e: Event) => { this.amount = (e.target as HTMLInputElement).value; }}></label><button type="submit">${this.text('สร้าง QR', 'Create QR')}</button></form>` : nothing}
     ${this.state === 'loading' ? html `<p>${this.text('กำลังโหลด…', 'Loading…')}</p>` : nothing}
-    ${this.state === 'qr' && this.image ? html `<p>${this.text('สแกนเพื่อชำระ', 'Scan to pay')} ${((this.payment?.amountSatang ?? 0) / 100).toFixed(2)} THB</p><img data-qr src=${this.image} alt="PromptPay QR"><button @click=${() => this.json(this.url('/cancel'), { method: 'POST' }).then(p => this.accept(p, this.epoch)).catch(e => this.failure(e))}>${this.text('ยกเลิก', 'Cancel')}</button>` : nothing}
+    ${this.state === 'qr' && this.image ? html `<p>${this.text('สแกนเพื่อชำระ', 'Scan to pay')} ${((this.payment?.amountSatang ?? 0) / 100).toFixed(2)} THB</p><img data-qr src=${this.image} alt="PromptPay QR"><button @click=${this.cancelPayment}>${this.text('ยกเลิก', 'Cancel')}</button>` : nothing}
     ${this.state === 'success' ? html `<p data-status="success">${this.text('ชำระเงินสำเร็จ', 'Payment successful')}</p>` : nothing}
     ${this.state === 'expired' ? html `<p data-status="expired">${this.text('QR หมดอายุ', 'QR expired')}</p>` : nothing}
     ${this.state === 'cancelled' ? html `<p>${this.text('ยกเลิกแล้ว', 'Cancelled')}</p>` : nothing}
-    ${this.state === 'error' ? html `<p role="alert">${this.error}</p>${this.mode === 'input' ? html `<button @click=${() => { this.state = 'input'; this.requestUpdate(); }}>${this.text('ลองใหม่', 'Try again')}</button>` : nothing}` : nothing}
+    ${this.mode === 'input' && ['cancelled', 'expired'].includes(this.state) ? html `<button @click=${this.newPayment}>${this.text('สร้างรายการใหม่', 'New payment')}</button>` : nothing}
+    ${this.state === 'error' ? html `<p role="alert">${this.error}</p>${this.mode === 'input' ? html `<button @click=${this.newPayment}>${this.text('ลองใหม่', 'Try again')}</button>` : nothing}` : nothing}
   </section>`;
     }
 }

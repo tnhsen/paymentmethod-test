@@ -24,7 +24,7 @@ pnpm start
 pnpm test
 ```
 
-คำสั่งนี้ build ทุก package รวม Next example, typecheck, core/server tests และ Playwright Chromium (ต้องติดตั้ง browser ก่อน) ใช้ port 4000/5173 จึงต้องหยุด demo ที่เปิดอยู่ก่อนทดสอบ
+คำสั่งนี้ build ทุก package รวม Next example, typecheck, core/server tests และ Playwright Chromium (ต้องติดตั้ง browser ก่อน) browser tests ใช้ port 14000/15173 แยกจาก demo ปรับได้ด้วย E2E_API_PORT/E2E_UI_PORT
 
 Docker: คัดลอก `.env.example` เป็น `.env` แล้ว `docker compose up --build` เปิด demo ที่ localhost:5173 ใช้ Postgres พร้อม volume ถาวร ตั้ง secret ใหม่ก่อนนำไปใช้จริง
 

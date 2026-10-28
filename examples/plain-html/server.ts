@@ -13,7 +13,15 @@ const files: Record<string, [
     string
 ]> = { '/': [new URL('./index.html', import.meta.url), 'text/html'], '/checkout.js': [new URL('./checkout.js', import.meta.url), 'application/javascript'], '/pay-qr.js': [new URL('../../packages/web-component/dist/pay-qr.js', import.meta.url), 'application/javascript'] };
 for (const [path, [file, type]] of Object.entries(files))
-    app.get(path, async (_req, reply) => reply.type(type).send(await readFile(fileURLToPath(file))));
+    app.get(path, async (_req, reply) => {
+        let content = await readFile(fileURLToPath(file));
+        if (path === '/' && process.env.PUBLIC_API_BASE) {
+            const url = new URL(process.env.PUBLIC_API_BASE);
+            if (!['http:', 'https:'].includes(url.protocol)) throw new Error('Invalid PUBLIC_API_BASE');
+            content = Buffer.from(content.toString().replace('api-base="http://localhost:4000"', `api-base="${url.origin}"`));
+        }
+        return reply.type(type).send(content);
+    });
 app.post('/api/create-payment', async (req, reply) => { const b = req.body as {
     amountSatang?: number;
 }; if (!Number.isSafeInteger(b.amountSatang) || b.amountSatang! < 100 || b.amountSatang! > 10000000)
