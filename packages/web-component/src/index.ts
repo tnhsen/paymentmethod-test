@@ -24,6 +24,8 @@ export class PayQRElement extends LitElement {
     private poll?: ReturnType<typeof setTimeout>;
     private epoch = 0;
     private creating = false;
+    private toast = '';
+    private toastTimer?: ReturnType<typeof setTimeout>;
     static styles = css `:host{display:block;font:16px system-ui;color:#162235;max-width:360px}:host([theme=dark]){color:#edf2ff}.box{border:1px solid #acb9ca;border-radius:16px;padding:24px;text-align:center}img{display:block;width:256px;height:256px;max-width:100%;margin:12px auto}input,button{font:inherit;padding:10px;border-radius:8px;border:1px solid #8797ab;max-width:100%;box-sizing:border-box}button{cursor:pointer;margin-top:12px;background:#195bd7;color:white}button.save{background:#15803d;border-color:#15803d}button.save:hover{background:#166534}button.cancel{background:#dc2626;border-color:#dc2626}button.cancel:hover{background:#b91c1c}button:focus-visible{outline:3px solid #162235;outline-offset:3px}label{display:grid;gap:8px}p{overflow-wrap:anywhere}[role=alert]{color:#c33}`;
     connectedCallback() { super.connectedCallback(); queueMicrotask(() => { if (this.isConnected)
         this.reset(); }); }
@@ -31,7 +33,7 @@ export class PayQRElement extends LitElement {
     protected updated(changed: Map<PropertyKey, unknown>) { if (['apiBase', 'paymentId', 'clientToken', 'mode', 'createPaymentUrl'].some(k => changed.has(k)) && !this.creating)
         this.reset(); }
     private emit(name: string, detail: unknown) { this.dispatchEvent(new CustomEvent(name, { detail, bubbles: true, composed: true })); }
-    private clearQr() { this.payload = null; this.image = null; this.shadowRoot?.querySelector('[data-qr]')?.remove(); if (this.payment)
+    private clearQr() { clearTimeout(this.toastTimer); this.toast = ''; this.payload = null; this.image = null; this.shadowRoot?.querySelector('[data-qr]')?.remove(); if (this.payment)
         this.payment = { ...this.payment, qrPayload: null }; }
     private stop() { this.epoch++; this.abort?.abort(); clearTimeout(this.expiry); clearTimeout(this.poll); }
     private reset() { this.stop(); this.clearQr(); this.payment = null; this.error = ''; if (this.paymentId && this.clientToken && this.apiBase) {
@@ -207,6 +209,13 @@ export class PayQRElement extends LitElement {
         this.shadowRoot?.append(link);
         link.click();
         link.remove();
+        clearTimeout(this.toastTimer);
+        this.toast = this.text('บันทึกภาพแล้ว', 'Image saved');
+        this.requestUpdate();
+        this.toastTimer = setTimeout(() => {
+            this.toast = '';
+            this.requestUpdate();
+        }, 3000);
     }
     private text(th: string, en: string) { return this.locale === 'en' ? en : th; }
     render() {
@@ -219,7 +228,8 @@ export class PayQRElement extends LitElement {
     ${this.state === 'cancelled' ? html `<p>${this.text('ยกเลิกแล้ว', 'Cancelled')}</p>` : nothing}
     ${this.mode === 'input' && ['cancelled', 'expired'].includes(this.state) ? html `<button @click=${this.newPayment}>${this.text('สร้างรายการใหม่', 'New payment')}</button>` : nothing}
     ${this.state === 'error' ? html `<p role="alert">${this.error}</p>${this.mode === 'input' ? html `<button @click=${this.newPayment}>${this.text('ลองใหม่', 'Try again')}</button>` : nothing}` : nothing}
-  </section>`;
+  </section>
+    ${this.toast ? html `<div role="status" aria-live="polite" style="position:fixed;bottom:24px;left:50%;transform:translateX(-50%);z-index:1000;background:#dcfce7;color:#14532d;border:1px solid #86efac;padding:12px 20px;border-radius:12px;box-shadow:0 4px 16px #0003;max-width:calc(100vw - 32px);width:max-content;text-align:center;pointer-events:none">${this.toast}</div>` : nothing}`;
     }
 }
 if (!customElements.get('pay-qr'))

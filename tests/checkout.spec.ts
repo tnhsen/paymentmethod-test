@@ -4,6 +4,7 @@ test('downloads a PNG of the current QR and removes save button on cancel', asyn
   const downloadPromise = page.waitForEvent('download');
   await page.getByRole('button', { name: 'บันทึก QR Code', exact: true }).click();
   const download = await downloadPromise;
+  await expect(page.getByRole('status').filter({ hasText: 'บันทึกภาพแล้ว' })).toBeVisible();
   expect(download.suggestedFilename()).toBe(`promptpay-${payment.id}.png`);
   const stream = await download.createReadStream();
   const chunks: Buffer[] = [];
