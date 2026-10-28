@@ -24,7 +24,7 @@ export class PayQRElement extends LitElement {
     private poll?: ReturnType<typeof setTimeout>;
     private epoch = 0;
     private creating = false;
-    static styles = css `:host{display:block;font:16px system-ui;color:#162235;max-width:360px}:host([theme=dark]){color:#edf2ff}.box{border:1px solid #acb9ca;border-radius:16px;padding:24px;text-align:center}img{display:block;width:256px;height:256px;max-width:100%;margin:12px auto}input,button{font:inherit;padding:10px;border-radius:8px;border:1px solid #8797ab;max-width:100%;box-sizing:border-box}button{cursor:pointer;margin-top:12px;background:#195bd7;color:white}label{display:grid;gap:8px}p{overflow-wrap:anywhere}[role=alert]{color:#c33}`;
+    static styles = css `:host{display:block;font:16px system-ui;color:#162235;max-width:360px}:host([theme=dark]){color:#edf2ff}.box{border:1px solid #acb9ca;border-radius:16px;padding:24px;text-align:center}img{display:block;width:256px;height:256px;max-width:100%;margin:12px auto}input,button{font:inherit;padding:10px;border-radius:8px;border:1px solid #8797ab;max-width:100%;box-sizing:border-box}button{cursor:pointer;margin-top:12px;background:#195bd7;color:white}button.save{background:#15803d;border-color:#15803d}button.save:hover{background:#166534}button.cancel{background:#dc2626;border-color:#dc2626}button.cancel:hover{background:#b91c1c}button:focus-visible{outline:3px solid #162235;outline-offset:3px}label{display:grid;gap:8px}p{overflow-wrap:anywhere}[role=alert]{color:#c33}`;
     connectedCallback() { super.connectedCallback(); queueMicrotask(() => { if (this.isConnected)
         this.reset(); }); }
     disconnectedCallback() { this.stop(); this.clearQr(); super.disconnectedCallback(); }
@@ -197,12 +197,23 @@ export class PayQRElement extends LitElement {
             if (epoch === this.epoch) this.failure(e);
         }
     }
+    private saveQr() {
+        if (this.state !== 'qr' || !this.image || this.payment?.status !== 'qr_ready') return;
+        if (this.payment.expiresAt <= Date.now()) { this.localExpiry(); return; }
+        const link = document.createElement('a');
+        link.href = this.image;
+        link.download = `promptpay-${this.payment.id}.png`;
+        link.hidden = true;
+        this.shadowRoot?.append(link);
+        link.click();
+        link.remove();
+    }
     private text(th: string, en: string) { return this.locale === 'en' ? en : th; }
     render() {
         return html `<section class="box" aria-live="polite">
     ${this.state === 'input' ? html `<form @submit=${this.create}><label>${this.text('จำนวนเงิน (บาท)', 'Amount (THB)')}<input name="amount" inputmode="decimal" required .value=${this.amount} @input=${(e: Event) => { this.amount = (e.target as HTMLInputElement).value; }}></label><button type="submit">${this.text('สร้าง QR', 'Create QR')}</button></form>` : nothing}
     ${this.state === 'loading' ? html `<p>${this.text('กำลังโหลด…', 'Loading…')}</p>` : nothing}
-    ${this.state === 'qr' && this.image ? html `<p>${this.text('สแกนเพื่อชำระ', 'Scan to pay')} ${((this.payment?.amountSatang ?? 0) / 100).toFixed(2)} THB</p><img data-qr src=${this.image} alt="PromptPay QR"><button @click=${this.cancelPayment}>${this.text('ยกเลิก', 'Cancel')}</button>` : nothing}
+    ${this.state === 'qr' && this.image ? html `<p>${this.text('สแกนเพื่อชำระ', 'Scan to pay')} ${((this.payment?.amountSatang ?? 0) / 100).toFixed(2)} THB</p><img data-qr src=${this.image} alt="PromptPay QR"><div style="display:flex;gap:8px;justify-content:center;flex-wrap:wrap"><button type="button" class="save" @click=${this.saveQr}>${this.text('บันทึก QR Code', 'Save QR Code')}</button><button type="button" class="cancel" @click=${this.cancelPayment}>${this.text('ยกเลิก', 'Cancel')}</button></div>` : nothing}
     ${this.state === 'success' ? html `<p data-status="success">${this.text('ชำระเงินสำเร็จ', 'Payment successful')}</p>` : nothing}
     ${this.state === 'expired' ? html `<p data-status="expired">${this.text('QR หมดอายุ', 'QR expired')}</p>` : nothing}
     ${this.state === 'cancelled' ? html `<p>${this.text('ยกเลิกแล้ว', 'Cancelled')}</p>` : nothing}

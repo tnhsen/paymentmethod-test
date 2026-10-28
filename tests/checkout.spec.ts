@@ -1,4 +1,18 @@
 import { test, expect, type Page } from '@playwright/test';
+test('downloads a PNG of the current QR and removes save button on cancel', async ({ page }) => {
+  const payment = await create(page, '12.34');
+  const downloadPromise = page.waitForEvent('download');
+  await page.getByRole('button', { name: 'บันทึก QR Code', exact: true }).click();
+  const download = await downloadPromise;
+  expect(download.suggestedFilename()).toBe(`promptpay-${payment.id}.png`);
+  const stream = await download.createReadStream();
+  const chunks: Buffer[] = [];
+  for await (const chunk of stream!) chunks.push(Buffer.from(chunk));
+  expect(Buffer.concat(chunks).subarray(0, 8).toString('hex')).toBe('89504e470d0a1a0a');
+  await expect(page.locator('[data-qr]')).toBeVisible();
+  await page.getByRole('button', { name: 'ยกเลิก', exact: true }).click();
+  await expect(page.getByRole('button', { name: 'บันทึก QR Code', exact: true })).toHaveCount(0);
+});
 test('cancel and recreate twice without refreshing resets QR and countdown', async ({ page }) => {
   await create(page, '10');
   for (const amount of ['20', '30']) {
